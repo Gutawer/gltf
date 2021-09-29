@@ -1,5 +1,7 @@
 #[cfg(feature = "KHR_texture_transform")]
 use crate::{extras::Extras, validation::Validate};
+#[cfg(feature = "KHR_texture_basisu")]
+use crate::{Index, image};
 use gltf_derive::Validate;
 use serde_derive::{Deserialize, Serialize};
 
@@ -7,9 +9,19 @@ use serde_derive::{Deserialize, Serialize};
 #[derive(Clone, Debug, Default, Deserialize, Serialize, Validate)]
 pub struct Sampler {}
 
+#[cfg(feature = "KHR_texture_basisu")]
+#[derive(Clone, Debug, Deserialize, Serialize, Validate)]
+pub struct TextureBasisu {
+    pub source: Index<image::Image>,
+}
+
 /// A texture and its sampler.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, Validate)]
-pub struct Texture {}
+pub struct Texture {
+    #[cfg(feature = "KHR_texture_basisu")]
+    #[serde(default, rename = "KHR_texture_basisu", skip_serializing_if = "Option::is_none")]
+    pub texture_basisu: Option<TextureBasisu>,
+}
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, Validate)]
 /// Reference to a `Texture`.

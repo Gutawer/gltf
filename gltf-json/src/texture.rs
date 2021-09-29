@@ -2,8 +2,8 @@ use gltf_derive::Validate;
 use serde_derive::{Serialize, Deserialize};
 use serde::{de, ser};
 use std::fmt;
-use crate::validation::Checked;
-use crate::{extensions, image, Extras, Index};
+use crate::validation::{Checked, Error, Validate};
+use crate::{extensions, image, Extras, Index, Root, Path};
 
 /// Corresponds to `GL_NEAREST`.
 pub const NEAREST: u32 = 9728;
@@ -173,7 +173,7 @@ pub struct Sampler {
 }
 
 /// A texture and its sampler.
-#[derive(Clone, Debug, Deserialize, Serialize, Validate)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Texture {
     /// Optional user-defined name for this object.
     #[cfg(feature = "names")]
@@ -185,7 +185,8 @@ pub struct Texture {
     pub sampler: Option<Index<Sampler>>,
 
     /// The index of the image used by this texture.
-    pub source: Index<image::Image>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<Index<image::Image>>,
 
     /// Extension specific data.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -195,6 +196,42 @@ pub struct Texture {
     #[serde(default)]
     #[cfg_attr(feature = "extras", serde(skip_serializing_if = "Option::is_none"))]
     pub extras: Extras,
+}
+
+impl Validate for Texture {
+    fn validate<P, R>(&self, root: &Root, path: P, report: &mut R)
+        where P: Fn() -> Path, R: FnMut(&dyn Fn() -> Path, Error)
+    {
+        #[cfg(not(feature = "KHR_texture_basisu"))]
+        if self.source.is_none() {
+            report(&|| path().field("source"), Error::Missing);
+        }
+        #[cfg(feature = "KHR_texture_basisu")]
+        {
+            // The basisu spec says that if the extension is marked as required,
+            // then the `source` field is not required
+            if !root.extensions_required.contains(&"KHR_texture_basisu".to_string()) {
+                if self.source.is_none() {
+                    report(&|| path().field("source"), Error::Missing);
+                }
+            } else {
+                if self.source.is_none() {
+                    if let Some(ext) = &self.extensions {
+                        if ext.texture_basisu.is_none() {
+                            report(&|| path().field("extensions.KHR_texture_basisu"), Error::Missing);
+                        }
+                    } else {
+                        report(&|| path().field("extensions.KHR_texture_basisu"), Error::Missing);
+                    }
+                }
+            }
+        }
+
+        self.sampler.validate(root, || path().field("sampler"), report);
+        self.source.validate(root, || path().field("source"), report);
+        self.extensions.validate(root, || path().field("extensions"), report);
+        self.extras.validate(root, || path().field("extensions"), report);
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Validate)]

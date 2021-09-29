@@ -140,8 +140,20 @@ impl<'a> Texture<'a> {
 
     /// Returns the image used by this texture.
     pub fn source(&self) -> image::Image<'a> {
-        self.document.images().nth(self.json.source.value() as usize).unwrap()
+        self.document.images().nth(self.json.source.unwrap().value() as usize).unwrap()
     }
+
+    /// Returns the images used by this texture.
+    #[cfg(feature = "KHR_texture_basisu")]
+	pub fn basisu_sources(&self) -> (Option<image::Image<'a>>, Option<image::Image<'a>>) {
+		let ext = &self.json.extensions;
+		let basisu = ext.as_ref().map(|e| e.texture_basisu.as_ref()).flatten();
+		let basisu_source = basisu.map(|b| b.source);
+		(
+			self.json.source.map(|s| self.document.images().nth(s.value() as usize).unwrap()),
+			basisu_source.map(|s| self.document.images().nth(s.value() as usize).unwrap()),
+		)
+	}
 
     /// Optional application specific data.
     pub fn extras(&self) -> &json::Extras {
